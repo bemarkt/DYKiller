@@ -130,7 +130,7 @@ BOOL DKVideoFeedTableSnapPagedOffset(UITableView *table) {
     CGPoint offset = table.contentOffset;
     if (!isfinite(offset.y) || offset.y <= 0.0) return NO;
 
-    CGFloat contentHeight = CGRectGetHeight(table.contentSize);
+    CGFloat contentHeight = table.contentSize.height;
     if (!isfinite(contentHeight) || contentHeight <= 0.0) return NO;
 
     // 内容高度不是视口整数倍 → 有表头 / 尾条 / 非常规行，偏移里本来就有额外量。
@@ -187,7 +187,7 @@ NSString *DKVideoFeedTableOffsetStats(UITableView *table) {
 
     CGPoint offset = table.contentOffset;
     CGFloat viewport = CGRectGetHeight(table.bounds);
-    CGFloat contentHeight = CGRectGetHeight(table.contentSize);
+    CGFloat contentHeight = table.contentSize.height;
 
     NSIndexPath *indexPath = [table indexPathForRowAtPoint:CGPointMake(0.0, offset.y + 1.0)];
     CGRect row = indexPath ? [table rectForRowAtIndexPath:indexPath] : CGRectNull;

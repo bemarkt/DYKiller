@@ -100,6 +100,113 @@ static CGFloat DKFeedOriginalHeight(UIView *view) {
     return DKVideoFeedTableOriginalHeight(DKFeedTableForView(view)).doubleValue;
 }
 
+#pragma mark - 翻页偏移对齐
+
+// 把停在「页中间」的偏移按行几何对齐到整页。
+//
+// 这是「进过直播间回来，博主主页的视频上移」的直接病灶。实测现场（0.6.2 / 40.7.0 / 440×956）：
+//   cell 高 956，行矩形精确落在 1912 与 2868（= 2·956 / 3·956），contentSize 20076 = 21·956；
+//   可 contentOffset 是 2702，而 2702 = 873×3 + 83，既不是 956 的倍数也不是 873 的倍数。
+// 行按整屏页高排、偏移按「底栏占位那一版」翻页再叠一个底栏，于是视口顶边落在第 2 行内部：
+// 上面露出 166pt 的上一页、下面露出第 3 行的绝大部分——用户看到的就是视频整体上移。
+//
+// 偏移不是我们写的，是直播间进出时抖音自己算的：进直播间底栏让位、页高从 873 变 956，
+// 退出后行高回到整屏，偏移却留着旧倍数的残值。它只被消费一次，没有任何一次 frame 写入
+// 会回头复核，所以只能在停稳之后按行矩形拉回来。
+//
+// 守卫都按结构判定，不靠「记住曾经多高」那种软信号（首帧根本没有历史可比）：
+//   · 拖动 / 惯性 / 跟踪期间不动，否则与手势互相拉扯；
+//   · 内容高度必须是视口高的整数倍——有表头、有尾条的页面倍数对不上，一律不碰，
+//     这类页面的偏移本来就含表头量，对齐到行顶反而会跳；
+//   · 只处理「一行就是一页」的表（好友聊天、搜索那种列表行不是整页）；
+//   · 只对齐到最近的行顶，且本来就在行顶时不动，避免每轮布局写入同一个值。
+BOOL DKVideoFeedTableSnapPagedOffset(UITableView *table) {
+    if (!table || !DKVideoFullscreenOn()) return NO;
+    if (table.isDragging || table.isDecelerating || table.isTracking) return NO;
+
+    CGFloat viewport = CGRectGetHeight(table.bounds);
+    if (!isfinite(viewport) || viewport <= 0.0) return NO;
+
+    CGPoint offset = table.contentOffset;
+    if (!isfinite(offset.y) || offset.y <= 0.0) return NO;
+
+    CGFloat contentHeight = CGRectGetHeight(table.contentSize);
+    if (!isfinite(contentHeight) || contentHeight <= 0.0) return NO;
+
+    // 内容高度不是视口整数倍 → 有表头 / 尾条 / 非常规行，偏移里本来就有额外量。
+    double pages = round(contentHeight / viewport);
+    if (pages < 1.0 || fabs(contentHeight - pages * viewport) > kDKFeedTolerance) return NO;
+
+    // 取行顶离当前偏移最近的那一行：用户正看着的那一页不动，只把跨页的那半格对齐回来。
+    NSIndexPath *containing = [table indexPathForRowAtPoint:CGPointMake(0.0, offset.y + 1.0)];
+    if (!containing) return NO;
+
+    CGRect row = [table rectForRowAtIndexPath:containing];
+    if (CGRectIsNull(row) || !isfinite(row.origin.y)) return NO;
+
+    // 一行就是一页；列表型行高对这个页面没有意义，动了反而是错。
+    CGFloat rowHeight = CGRectGetHeight(row);
+    if (rowHeight <= 0.0 || fabs(rowHeight - viewport) > kDKFeedTolerance) return NO;
+
+    CGFloat target = row.origin.y;
+    CGFloat nearest = fabs(target - offset.y);
+    NSInteger rowsInSection = [table numberOfRowsInSection:containing.section];
+    for (NSInteger step = -1; step <= 1; step += 2) {
+        NSInteger neighbour = containing.row + step;
+        if (neighbour < 0 || neighbour >= rowsInSection) continue;
+
+        NSIndexPath *path = [NSIndexPath indexPathForRow:neighbour inSection:containing.section];
+        CGRect candidate = [table rectForRowAtIndexPath:path];
+        if (CGRectIsNull(candidate)) continue;
+
+        CGFloat distance = fabs(candidate.origin.y - offset.y);
+        if (distance < nearest) {
+            nearest = distance;
+            target = candidate.origin.y;
+        }
+    }
+
+    if (fabs(target - offset.y) <= kDKFeedTolerance) return NO;
+
+    // 夹进合法的偏移区间：末页对齐到行顶可能超出底部，扣掉内缩后再兜一次。
+    UIEdgeInsets insets = table.adjustedContentInset;
+    CGFloat maxOffset = contentHeight - viewport + insets.bottom;
+    CGFloat minOffset = -insets.top;
+    if (isfinite(maxOffset) && maxOffset > minOffset) target = MIN(target, maxOffset);
+    target = MAX(target, minOffset);
+    if (fabs(target - offset.y) <= kDKFeedTolerance) return NO;
+
+    table.contentOffset = CGPointMake(offset.x, target);
+    return YES;
+}
+
+// 翻页偏移现场：当前 offsetY、视口高、内容高与页数、落在哪一行与该行行顶/行高。
+// 供探针确认「偏移不是任何一整页的倍数」这类现场，下次换机型不用重新推断。
+NSString *DKVideoFeedTableOffsetStats(UITableView *table) {
+    if (!table) return @"(无表)";
+
+    CGPoint offset = table.contentOffset;
+    CGFloat viewport = CGRectGetHeight(table.bounds);
+    CGFloat contentHeight = CGRectGetHeight(table.contentSize);
+
+    NSIndexPath *indexPath = [table indexPathForRowAtPoint:CGPointMake(0.0, offset.y + 1.0)];
+    CGRect row = indexPath ? [table rectForRowAtIndexPath:indexPath] : CGRectNull;
+
+    double pages = viewport > 0.0 ? contentHeight / viewport : 0.0;
+
+    return [NSString stringWithFormat:
+        @"offsetY=%.0f  视口=%.0f  内容高=%.0f（%.2f 页）  落在行=%@ 行顶=%.0f 行高=%.0f  "
+         "离行顶=%.0f",
+        offset.y,
+        viewport,
+        contentHeight,
+        pages,
+        indexPath ?: (id)@"(无)",
+        CGRectIsNull(row) ? 0.0 : CGRectGetMinY(row),
+        CGRectIsNull(row) ? 0.0 : CGRectGetHeight(row),
+        CGRectIsNull(row) ? 0.0 : fabs(CGRectGetMinY(row) - offset.y)];
+}
+
 #pragma mark - 撑高视频表
 
 // 共享撑高规则同时供表写入与控制器布局入口调用。首页表自己实现 setFrame:，
@@ -188,16 +295,19 @@ BOOL DKVideoFeedTablePrepareForController(UIViewController *controller, UITableV
 
 // 控制器完成原生布局后，子表已进入视图树，可以读取父容器高度。
 // 两套控制器共用撑高规则；仅在目标未满足时修改子表 frame。
+// 顺带把停在页中间的翻页偏移按行几何拉回整页：偏移只被消费一次，
+// 布局后不复核就永远是错的（这是「进过直播间回来视频上移」留下的那份残值）。
 static void DKSyncFeedTableLayout(UITableView *table, DKFeedTableLayoutStats *stats) {
     stats->runs++;
     if (!table) return;
 
     CGRect adjusted = DKVideoFeedTableAdjustFrame(table, table.frame);
-    if (CGRectIsNull(adjusted)) return;
-
-    table.frame = adjusted;
-    gHitTableLayout++;
-    stats->adjustments++;
+    if (!CGRectIsNull(adjusted)) {
+        table.frame = adjusted;
+        gHitTableLayout++;
+        stats->adjustments++;
+    }
+    DKVideoFeedTableSnapPagedOffset(table);
 }
 
 %hook AWEFeedTableViewController

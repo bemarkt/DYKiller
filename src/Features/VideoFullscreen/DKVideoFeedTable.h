@@ -30,6 +30,13 @@ BOOL DKVideoFeedTablePrepareForController(UIViewController *controller, UITableV
 /// 详情页建行与分页前准备、三个行高入口的调用及修正统计。
 NSString *DKVideoDetailTableStats(void);
 
+/// 翻页偏移现场：当前 offsetY、视口高、内容高与页数、落在哪一行与该行行顶/行高。
+/// 供探针确认「偏移不是任何一整页的倍数」这类现场，下次换机型不用重新推断。
+///
+/// 只诊断、不改偏移。偏移会越用越偏的根因在 DKVideoDetailTable.xm 的正反两个换算入口，
+/// 在那里修；在布局回调里写 contentOffset 会自我触发，反而把错误放大。
+NSString *DKVideoFeedTableOffsetStats(UITableView *table);
+
 /// HUD 钉位与视频表修正的会话累计统计；首页和详情控制器布局分别报告调用与补正次数。
 NSString *DKVideoFeedTableStats(void);
 

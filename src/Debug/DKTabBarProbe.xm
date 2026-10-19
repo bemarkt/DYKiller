@@ -1020,6 +1020,8 @@ static void DKProbeAppendFeed(NSMutableString *out) {
          stretchStatus];
         [out appendFormat:@"  contentOffset=%@  contentSize=%@\n",
          NSStringFromCGPoint(table.contentOffset), NSStringFromCGSize(table.contentSize)];
+        // 偏移是不是任何一整页的倍数：不是就说明它停在页中间，视频会被推上去。
+        [out appendFormat:@"  翻页偏移: %@\n", DKVideoFeedTableOffsetStats(table)];
 
         for (UITableViewCell *cell in table.visibleCells) {
             NSIndexPath *indexPath = [table indexPathForCell:cell];

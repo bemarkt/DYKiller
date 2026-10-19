@@ -100,6 +100,42 @@ static CGFloat DKFeedOriginalHeight(UIView *view) {
     return DKVideoFeedTableOriginalHeight(DKFeedTableForView(view)).doubleValue;
 }
 
+#pragma mark - 翻页偏移诊断
+
+// 这里**只诊断、不改偏移**。
+//
+// 0.6.2 到本轮之间曾经在这里「按行几何把偏移拉回整页」，那是错的：本函数挂在
+// viewDidLayoutSubviews 上，而写 contentOffset 又会触发布局，于是形成
+// 「布局 → 写偏移 → 布局」的自我触发；它的判据还依赖 contentSize / 拖动状态这类
+// 在途变化的值，每轮都会把同一个偏移再推一次，偏移于是越用越大、甚至点 A 进 B。
+//
+// 偏移的正确换算在 DKVideoDetailTable.xm 的正反两个入口里做——那里只改返回值、
+// 不写 offset，天然不会触发第二轮布局。这里保留现场读数供以后核对。
+NSString *DKVideoFeedTableOffsetStats(UITableView *table) {
+    if (!table) return @"(无表)";
+
+    CGPoint offset = table.contentOffset;
+    CGFloat viewport = CGRectGetHeight(table.bounds);
+    CGFloat contentHeight = table.contentSize.height;
+
+    NSIndexPath *indexPath = [table indexPathForRowAtPoint:CGPointMake(0.0, offset.y + 1.0)];
+    CGRect row = indexPath ? [table rectForRowAtIndexPath:indexPath] : CGRectNull;
+
+    double pages = viewport > 0.0 ? contentHeight / viewport : 0.0;
+
+    return [NSString stringWithFormat:
+        @"offsetY=%.0f  视口=%.0f  内容高=%.0f（%.2f 页）  落在行=%@ 行顶=%.0f 行高=%.0f  "
+         "离行顶=%.0f",
+        offset.y,
+        viewport,
+        contentHeight,
+        pages,
+        indexPath ?: (id)@"(无)",
+        CGRectIsNull(row) ? 0.0 : CGRectGetMinY(row),
+        CGRectIsNull(row) ? 0.0 : CGRectGetHeight(row),
+        CGRectIsNull(row) ? 0.0 : fabs(CGRectGetMinY(row) - offset.y)];
+}
+
 #pragma mark - 撑高视频表
 
 // 共享撑高规则同时供表写入与控制器布局入口调用。首页表自己实现 setFrame:，
@@ -188,6 +224,11 @@ BOOL DKVideoFeedTablePrepareForController(UIViewController *controller, UITableV
 
 // 控制器完成原生布局后，子表已进入视图树，可以读取父容器高度。
 // 两套控制器共用撑高规则；仅在目标未满足时修改子表 frame。
+//
+// 这里**不再**顺手纠正翻页偏移：写 contentOffset 会触发布局，而本方法正是布局回调，
+// 于是形成「布局→写偏移→布局」的自我触发；一旦判据依赖的 contentSize 等在途中变化，
+// 每轮都会把同一个偏移再推一次，表现为偏移越用越大、点 A 进 B。
+// 偏移的正确换算在 DKVideoDetailTable.xm 的正反两个入口里做，那里不写偏移、只改返回值。
 static void DKSyncFeedTableLayout(UITableView *table, DKFeedTableLayoutStats *stats) {
     stats->runs++;
     if (!table) return;

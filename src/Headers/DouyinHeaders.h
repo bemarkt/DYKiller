@@ -15,11 +15,16 @@
 @end
 
 @interface AWEFeedVideoButton : UIButton
+@property (nonatomic, copy) NSString *imageNameString;
 @property (nonatomic, readonly, strong) UIImageView *buttonImageView;
 @property (nonatomic, strong) UIImageView *aweImageView;
 @property (nonatomic, strong) UILabel *label;
 @property (nonatomic, strong) UILabel *buttonLabel;
 @property (nonatomic, strong) UIView *containerView;
+@end
+
+// AWEFeedVideoButton 的图片容器，buttonImageView 的尺寸在它布局时排出。
+@interface AWEFeedVideoButtonContainerView : UIView
 @end
 
 @interface AWEPlayInteractionListenFeedView : UIView
@@ -239,6 +244,53 @@
 - (BOOL)enableShowInnerPiPWhenFullScreen;
 @end
 
+// 弹幕渲染结构：正文与点赞数字都可能使用 AWEDanmakuContentLabel，调用方须通过 contentLabel 关系区分。
+@interface AWEDanmakuContentLabel : UILabel
+@property (nonatomic, assign) long long type;
+@property (nonatomic, copy) NSString *danmakuText;
+@property (nonatomic, copy) NSArray *danmakuStyleList;
+@property (nonatomic, strong) UIColor *strokeColor;
+@property (nonatomic, assign) double strokeWidth;
+- (id)initWithFrame:(CGRect)frame textColor:(UIColor *)textColor type:(long long)type;
+@end
+
+@interface AWEDanmakuItemDescriptor : NSObject
+@property (nonatomic, readonly) id danmakuModel;
+@end
+
+@interface AWEDanmakuDiggNumView : UIView
+@property (nonatomic, strong) UIImageView *diggImageView;
+@property (nonatomic, strong) AWEDanmakuContentLabel *diggNumLabel;
+- (void)updateDiggImageAndDiggLabel;
+- (void)configDanmakuDiggImageWithModel:(id)model;
+- (void)updateLayOutIfNeed;
+@end
+
+@interface AWEDanmakuItemCommonView : UIView
+@property (nonatomic, strong) AWEDanmakuContentLabel *contentLabel;
+@property (nonatomic, strong) AWEDanmakuDiggNumView *diggNumView;
+@property (nonatomic, strong) id danmaKuModel;
+- (void)updateWithDescriptor:(id)descriptor;
+- (void)prepareForReuse;
+- (void)updateDanmaKuUnitView;
+@end
+
+@interface AWEDanmakuItemAuthorView : AWEDanmakuItemCommonView
+@end
+@interface AWEDanmakuItemActivityView : AWEDanmakuItemCommonView
+@end
+@interface AWEDanmakuItemAdView : AWEDanmakuItemCommonView
+@end
+
+@interface AWEPlayInteractionDanmakuStylesInfo : NSObject
+@property (nonatomic, assign) double danmakuAlpha;
+@end
+@interface AWEDanmakuConfigSettingManager : NSObject
+@property (nonatomic, strong) AWEPlayInteractionDanmakuStylesInfo *verticalStylesInfo;
+@property (nonatomic, strong) AWEPlayInteractionDanmakuStylesInfo *landscapeStylesInfo;
++ (instancetype)sharedInstance;
+@end
+
 // 弹幕渲染层。抖音开评论面板时就是把这一层的 alpha 压成 0（实测半屏 / 全屏都是），
 // 容器与各条弹幕视图本身不动。
 @interface DDanmakuPlayerView : UIView
@@ -289,12 +341,23 @@
 - (void)awe_themeReload;
 @end
 
-// 第三行功能键。imageView 是 56×56 白圆+图标；smallImageView 导出里无图。
+// 功能圆钮：主 imageView 承载圆底或合成图，smallImageView 承载独立小图标。
 @interface AWESharePanelFunctionCell : UICollectionViewCell
 @property (nonatomic, strong) UIImageView *imageView;
 @property (nonatomic, strong) UIImageView *smallImageView;
+- (void)setupViews;
 - (void)updateWithViewModel:(id)viewModel bigFontAdapter:(id)adapter;
 - (void)updateImageViewWithViewModel:(id)viewModel;
+@end
+
+@interface AWEShareContext : NSObject
+@property (nonatomic, readonly) AWEAwemeModel *aweme;
+@end
+
+@interface AWESharePanelFunctionsDataManager : NSObject
+@property (nonatomic, copy) NSArray *dataSource;
+- (void)fetchSharePanelFunctionConfigWithScene:(id)scene shareContext:(AWEShareContext *)context
+                         customConfiguration:(id)configuration shareView:(id)shareView;
 @end
 
 // 分享评论面板里「复制该评论」「收藏」那种行。白卡片底不是 backgroundColor，
@@ -369,6 +432,50 @@
 
 // 播放进度条（首页、朋友页共用）。progressSliderDelegate 为 AWEDProgressCoreContainer。
 @interface AWEFeedProgressSlider : UIView
+@property (nonatomic, weak) id progressSliderDelegate;
+@end
+
+// 进度条章节点：按 progressWidth 把章节时间换成点位（加在进度条上），吸附区间与拖动换算同一口径。
+// shouldFollowSliderWidthForChapterPoints 为 NO 时章节控制器固定取屏宽 − 24；
+// progressTimingViewDidLayoutSubviews 是它自己的重排入口（重置章节缩略图索引、updateChapterSlider、openChapterLoopIfNeed）。
+@interface AWEDProgressChapterContainer : NSObject
+- (AWEFeedProgressSlider *)progressSlider;
+- (double)progressWidth;
+- (BOOL)shouldFollowSliderWidthForChapterPoints;
+- (BOOL)isChapterStyle;
+- (void)progressTimingViewDidLayoutSubviews;
+@end
+
+// 进度条各模块共用的共享数据中枢；sharedDataOfID: 按数据 ID 现取（不少为按需求值的块）。
+@interface AWEArchEventDataController : NSObject
+- (id)sharedDataOfID:(id)dataID;
+@end
+
+// 进度条共享数据的 ID；progressStatusVideoDuration 为作品时长（毫秒，NSNumber）。
+@interface AWEDProgressCoreDataID : NSObject
++ (id)progressStatusVideoDuration;
+@end
+
+// feed 页进度条布局策略：常态 / 唤醒 frame 与 progressWidth 都由左右边距 progressSliderLeftRightArea 算出
+// （progressWidth = 布局宽 − 2 × 边距，常态 frame = {边距, y, progressWidth, 2}），每次取 frame 都现取边距。
+@interface AWEDProgressLayoutFeedStrategy : NSObject
+- (AWEArchEventDataController *)edc;
+@end
+
+@class AWEDProgressStateChangeContainer;
+
+// 进度条的总控：播放进度经 updateProgressSliderWithTime:totalDuration: 送到这里（播放中约 0.5 s 一次），
+// setProgressState: 写 1 常态 / 2 唤醒态（暂停、拖动）。videoDuration 为作品时长（毫秒），
+// lastProgressDuration 为最近一次送来的播放时间（秒）。常态是否透明经它转问 AWEDProgressHidePluginContainer。
+// edc 与其布局策略的 edc 为同一个对象。
+@interface AWEDProgressCoreContainer : NSObject
+- (AWEFeedProgressSlider *)progressSlider;
+- (AWEDProgressChapterContainer *)chapterContainer;
+- (AWEDProgressStateChangeContainer *)stateChangeContainer;
+- (AWEArchEventDataController *)edc;
+- (double)videoDuration;
+- (double)lastProgressDuration;
+- (BOOL)shouldTransparentProgressSliderOnStableState;
 @end
 
 // 进度条常态是否透明的判定方：抖音按视频时长返回，短视频为 YES。
@@ -472,11 +579,341 @@
 - (void)setupCopyFeedDiscoverEntranceView:(UIView *)view;
 @end
 
+#pragma mark - 朋友页精简用到的类
+
+// 朋友页顶栏。左侧入口容器 publishEntranceView 内是日常相机（头像和加号），右侧为朋友申请按钮（含未读角标）。
+@interface AWEFamiliarNavView : UIView
+@property (nonatomic, strong, readonly) UIView *publishEntranceView;
+@property (nonatomic, strong, readonly) UIButton *friendsRequestButton;
+@end
+
+// 朋友页「限时日常 ▾」胶囊；显隐由天窗胶囊协调器写 hidden。
+@interface AWEFamiliarSkylightBubbleView : UIView
+@end
+
+@interface AFDFamiliarViewController : UIViewController
+- (void)showStorySkylightCapsuleIfNeeded;
+- (void)dismissStorySkylightCapsule;
+@end
+
+// 朋友页天窗（限时日常头像列表）。点胶囊、刷新后自动展开、下拉手势开始与拖动都先过 enableOpenWithEnterMethod:。
+@interface AWEFamiliarSkylightViewController : UIViewController
+- (BOOL)enableOpenWithEnterMethod:(id)enterMethod;
+- (BOOL)isOpening;
+@end
+
+// 头像下方「私信」图标的控制器。shouldShowSendMessageView: 决定是否显示，sendMessageView 内含阴影与图标。
+@interface AWEPlayInteractionUserAvatarContext : NSObject
+@property (nonatomic, strong, readonly) id model;
+@end
+
+@interface AWEPlayInteractionUserAvatarSendMsgController : NSObject
+@property (nonatomic, strong, readonly) AWEPlayInteractionUserAvatarContext *userAvatarContext;
+@property (nonatomic, strong, readonly) UIView *sendMessageView;
+- (BOOL)shouldShowSendMessageView:(id)model;
+- (void)showSendMessageViewWithAnimation:(BOOL)animated;
+- (void)hideSendMessageView;
+@end
+
+// 朋友页内容流响应的条目；type 8 为「看看朋友推荐的作品」卡片，其 aweme 带 friendRecommendCard。
+@interface AWEConcernCardModel : NSObject
+@property (nonatomic, assign, readonly) NSInteger type;
+@property (nonatomic, strong, readonly) AWEAwemeModel *aweme;
+@end
+
+@interface AWEAwemeModel (DKFriendRecommendCard)
+- (id)friendRecommendCard;
+@end
+
+// 朋友页内容流响应（网络与预加载）；数据控制器经 cardList 读取条目。
+@interface AWEFamiliarFeedResponseModel : NSObject
+- (NSArray *)cardList;
+@end
+
+@interface AWEFamiliarFeedPreloadResponse : NSObject
+- (NSArray *)cardList;
+@end
+
+#pragma mark - 消息页精简用到的类
+
+// 消息页导航栏组件。每个槽位是一组候选按钮组件，布局时取第一个 canShowInNaviBar 为真的组件；
+// 右一（加号位）是右侧容器的锚，右二（搜索位）挂在右一左边。
+@interface AWEIMMessageTabNaviBarComponent : NSObject
+@property (nonatomic, copy) NSArray *rightFirstBtnComponents;
+@property (nonatomic, copy) NSArray *rightSecondBtnComponents;
+- (void)reloadNaviBarButtons;
+@end
+
+// 导航栏按钮组件：左一侧边栏、左二运营位（装扮商店）、右二搜索、右一加号。
+@interface AWEIMMessageTabSideBarButtonComponent : NSObject
+- (BOOL)canShowInNaviBar;
+@end
+
+@interface AWEIMMessageTabNavBarResourceSlotComponent : NSObject
+- (BOOL)canShowInNaviBar;
+@end
+
+@interface AWEIMMessageTabNavBarResourceSlotComponentV2 : NSObject
+- (BOOL)canShowInNaviBar;
+@end
+
+@interface AWEIMMessageTabSearchComponent : NSObject
+- (BOOL)canShowInNaviBar;
+@end
+
+@interface AWEIMMessageTabPlusButtonComponent : NSObject
+- (BOOL)canShowInNaviBar;
+@end
+
+// 头像行的差异数据快照；条目标识即头像行的视图模型。
+@interface RxDiffableDataSourceSnapshot : NSObject
+- (NSArray *)sectionIdentifiers;
+- (NSArray *)itemIdentifiers;
+- (NSArray *)itemIdentifiersInSectionWithIdentifier:(id)sectionIdentifier;
+- (void)deleteItemsWithIdentifiers:(NSArray *)identifiers;
+@end
+
+@interface RxCollectionViewDiffableDataSource : NSObject
+- (RxDiffableDataSourceSnapshot *)snapshot;
+@end
+
+// 头像行条目：vmType 1 好友、4 状态设置、8 业务入口；业务入口为 AWEIMSkylightBizViewModel 及其子类。
+@interface AWEIMOnlineContactAvatarViewModel : NSObject
+@property (nonatomic, assign, readonly) NSUInteger vmType;
+@end
+
+@interface AWEIMSkylightBizViewModel : AWEIMOnlineContactAvatarViewModel
+@end
+
+@interface AWEIMSkylightCellViewModel : NSObject
+@property (nonatomic, strong, readonly) AWEIMOnlineContactAvatarViewModel *model;
+@end
+
+@interface AWEIMSkylightCommonCell : UICollectionViewCell
+- (void)renderWithViewModel:(AWEIMSkylightCellViewModel *)viewModel;
+@end
+
+// 头像行视图组件：所有数据写入最终都经 applySnapshot:animatingDifferences:completion:。
+@interface AWEIMSkylightViewComponent : NSObject
+@property (nonatomic, strong, readonly) RxCollectionViewDiffableDataSource *dataSource;
+@property (nonatomic, strong, readonly) UICollectionView *collectionView;
+- (void)applySnapshot:(RxDiffableDataSourceSnapshot *)snapshot animatingDifferences:(BOOL)animating completion:(id)completion;
+@end
+
+// 头像行数据组件：shouldHidden 为真时整行收起（列表视图经代理写 hidden 并重排表头）。
+@interface AWEIMSkylightDataComponent : NSObject
+- (BOOL)shouldHidden;
+@end
+
+@interface AWEIMSkylightListView : UIView
+@property (nonatomic, strong, readonly) AWEIMSkylightViewComponent *skylightInterface;
+- (void)refreshWithIgnoreFrequency:(BOOL)ignoreFrequency;
+- (void)performShouldHiddenDelegate;
+- (void)viewWillAppear;
+@end
+
+// 消息列表会话；互动消息为 AWEIMOfficialChatModel，type 1003、sessionId "-1003"。
+@interface AWEIMChatModel : NSObject
+@property (nonatomic, assign, readonly) NSInteger type;
+@property (nonatomic, copy, readonly) NSString *sessionId;
+@end
+
+@interface AWEIMChatCellViewModel : NSObject
+@property (nonatomic, strong, readonly) AWEIMChatModel *chat;
+@end
+
+@interface AWEIMChatListCommonCell : UITableViewCell
+@property (nonatomic, strong, readonly) AWEIMChatCellViewModel *cellViewModel;
+- (void)renderWithHolder:(id)holder;
+@end
+
+// 官方会话数据源。p_canShowOfficialChat: 为假时，upsert 里已在列表的会话转为删除。
+@interface IESIMOfficialChatDataSource : NSObject
+- (BOOL)p_canShowOfficialChat:(AWEIMChatModel *)chat;
+- (void)p_updateChatListWithUpsert:(NSArray *)upsert remove:(NSArray *)remove;
+- (AWEIMChatModel *)chatWithSession:(NSString *)sessionId;
+@end
+
 #pragma mark - 个人主页功能组用到的类
 
 @interface AWEUserProfileUGCContributionGuideEmptyCollectionViewCell : UICollectionViewCell
 @property (nonatomic, strong) UIView *bodyView;
 + (double)viewHeight;
+@end
+
+// 个人主页的页面 context（顶栏条目、头像扩展、编辑主页格持有）；isCurrentUser 为真即自己的主页。
+@interface AWEProfileContext : NSObject
+- (BOOL)isCurrentUser;
+@end
+
+// 个人主页头部的 context（头部各分区、昵称区组件持有）。
+@interface AWEProfileHeaderContext : NSObject
+- (BOOL)isCurrentUser;
+@end
+
+// 顶栏条目控制器：canShow 为真才进入左右数据源，navigationItemView 是放进顶栏容器的视图。
+// 添加好友 / 侧栏 / 搜索 / 访客分别是下面四个类，navigationType 依次为 4 / 6 / 7 / 8。
+@interface AWEProfileNaviAddFriendItemController : NSObject
+- (BOOL)canShow;
+- (UIView *)navigationItemView;
+- (AWEProfileContext *)profileContext;
+- (id)delegate;
+@end
+
+@interface AWEProfileNavMoreFuncItemController : NSObject
+- (BOOL)canShow;
+- (UIView *)navigationItemView;
+- (AWEProfileContext *)profileContext;
+- (id)delegate;
+@end
+
+@interface AWEProfileNavSearchItemController : NSObject
+- (BOOL)canShow;
+- (UIView *)navigationItemView;
+- (AWEProfileContext *)profileContext;
+- (id)delegate;
+@end
+
+@interface AWEProfileNavVisitorItemController : NSObject
+- (BOOL)canShow;
+- (UIView *)navigationItemView;
+- (AWEProfileContext *)profileContext;
+- (id)delegate;
+@end
+
+// 顶栏组件：reloadData 重新取左右数据源（逐个询问 canShow）并重排。
+@interface AWEProfileNavigationBaseComponent : NSObject
+- (void)reloadData;
+- (AWEProfileContext *)profileContext;
+@end
+
+@interface AWEProfileNavigationContainerView : UIView
+@end
+
+// 头部分区来源：reloadSections 与 updateSections: 都从 sectionViewModelArray 取分区 VM。
+@interface AWEProfileHeaderSectionProviderManager : NSObject
+- (NSArray *)sectionViewModelArray;
+- (AWEProfileHeaderContext *)context;
+@end
+
+// 头部列表 VM（AWEBaseListViewModel 子类）；reloadSections 替换分区后重算头部高度并刷新分页栏位置。
+@interface AWEProfileHeaderViewModel : NSObject
+- (void)reloadSections;
+- (BOOL)isCurrentUser;
+@end
+
+@interface AWEProfileHeaderSocialStatisticCollectionViewCellV2 : UICollectionViewCell
+- (BOOL)isCurrentUser;
+@end
+
+@interface AWEProfileHeaderHomeShortcutCell : UICollectionViewCell
+- (AWEProfileContext *)profileContext;
+@end
+
+// 「记录下幸福瞬间」等发布引导横幅所在分区的 cell，内容是 Compose 视图。
+@interface AWEUserProfileUGCHeaderContributionGuideBannerSectionCell : UICollectionViewCell
+- (AWEProfileHeaderContext *)context;
+@end
+
+// 头像扩展 avatar_story_publish：头像右下角加号。canShow 决定是否显示并参与点击分派；
+// p_shouldAddHollowMasks 为真时在头像上给加号挖出镂空。
+@interface AWEProfileAvatarStoryPublishController : NSObject
+- (BOOL)canShow;
+- (BOOL)p_shouldAddHollowMasks;
+- (void)updateUIWithContainerView:(UIView *)containerView anchorView:(UIView *)anchorView;
+- (UIButton *)story25PublishButton;
+- (AWEProfileContext *)profileContext;
+@end
+
+@interface AWEProfileAvatarSectionControllerV2 : NSObject
+- (void)configCell:(id)cell index:(NSInteger)index model:(id)model;
+- (void)reloadAvatarExtension;
+- (AWEProfileContext *)profileContext;
+@end
+
+// 昵称一行：昵称、切换账号箭头（switchAccountButton）与多账号未读点
+// （noticeUnreadDotView、multiAccountNoticeUnreadDotView）。
+@interface AWEProfileHeaderNameLabelContainerView : UIView
+- (AWEProfileHeaderContext *)context;
+@end
+
+@interface AWEProfileHeaderNameAreaSectionCell_New : UICollectionViewCell
+- (AWEProfileHeaderContext *)context;
+@end
+
+// AWERL 组件的虚拟视图；mount 后 renderedView 是挂上去的真实视图。
+@interface AWERLVirtualView : NSObject
+- (UIView *)renderedView;
+@end
+
+// 抖音号下方的胶囊行（创建 AI 形象、原创角色及运营胶囊）。buildVirtualView: 返回 nil 时整行不参与排布。
+@interface AWEProfileHeaderGenericOperationComponent : NSObject
+- (id)buildVirtualView:(id)data;
+- (AWERLVirtualView *)containerNode;
+- (AWEProfileHeaderContext *)context;
+- (void)setNeedsUpdate;
+@end
+
+// 分页模型：profileTabType 作品 0 / 喜欢 2 / 收藏 16 / 日常 38 / 足迹 46。
+@interface AWEUserProfileTabModel : NSObject
+@property (nonatomic, assign) NSInteger profileTabType;
+@end
+
+// 分页数据：tabArray 懒构建并缓存（同时写 _numOfTab），tabTitles 由 tabArray 生成；
+// updateUser:shouldRefreshTab:YES 清空缓存。
+@interface AWEUserProfileTabHelper : NSObject
+- (NSArray<AWEUserProfileTabModel *> *)tabArray;
+- (BOOL)p_isCurrentUser;
+- (id)user;
+- (void)updateUser:(id)user shouldRefreshTab:(BOOL)shouldRefreshTab;
+@end
+
+// 个人主页的分页编排：p_updateTabView 比较分页是否变化，变化时按 landingTabType 重载分页。
+@interface AWEUIOrchestrationHomeComponent : NSObject
+- (AWEUserProfileTabHelper *)tabHelper;
+- (void)p_updateTabView;
+@end
+
+// 个人主页功能区（观看历史 … 全部功能）的卡片模型；cardType 120 为「全部功能」。
+@interface AWEProfileExtensionAreaCardModel : NSObject
+@property (nonatomic, assign) unsigned long long cardType;
+@property (nonatomic, copy) NSString *title;
+@end
+
+@interface AWEProfileExtensionAreaContext : NSObject
+- (id)userModel;
+- (AWEProfileHeaderContext *)profileHeaderContext;
+- (id)dataSource;
+@end
+
+// 功能区数据源：refreshUserModel: 生成卡片列表（setCardList:），按列表建卡片控制器与视图，再通知视图持有者刷新。
+@interface AWEProfileEAVajraDataSource : NSObject
+- (void)refreshUserModel:(id)userModel;
+- (AWEProfileExtensionAreaContext *)context;
+@end
+
+// 功能区视图持有者：setCardList: 后 computeLayout 按卡片标题算宽度与间距；cell 里的卡片视图按下标向数据源取。
+@interface AWEProfileEAVajraViewHolder : NSObject
+- (NSArray *)cardList;
+- (UIView *)cardViewWithCardModel:(AWEProfileExtensionAreaCardModel *)cardModel;
+- (AWEProfileExtensionAreaContext *)context;
+@end
+
+@interface AWEProfileExtensionAreaCell : UICollectionViewCell
+- (void)addCardView:(UIView *)cardView;
+@end
+
+// 功能区卡片视图：图标 imageView（按卡片模型里的亮 / 暗色图标地址加载）在上，标题 titleLabel 在下。
+@interface AWEProfileExtensionAreaVajraStyleCardView : UIView
+- (AWEProfileExtensionAreaCardModel *)cardModel;
+- (void)configWithCardModel:(AWEProfileExtensionAreaCardModel *)cardModel;
+- (UIImageView *)imageView;
+- (UILabel *)titleLabel;
+@end
+
+// 个人主页的 SVG 图标集（与设置页图标同名，如 ic_gearsimplify_outlined_20）。
+@interface UIImage (AWEProfileSVG)
++ (UIImage *)svg_userProfileImageWithName:(NSString *)name size:(CGSize)size color:(UIColor *)color;
 @end
 
 #pragma mark - 媒体保存功能组用到的类
@@ -488,6 +925,17 @@
 @property (nonatomic, strong) NSString *duxIconName;
 @property (nonatomic, strong) NSString *describeString;
 @property (nonatomic, copy) id action;
+// 以下为长按菜单精简用到的字段：原生项的语义标识（如 speed、dislike），插件项为 nil。
+- (NSString *)panelBizVMIdentifier;
+@property (nonatomic, strong) UIView *subView;            // 行右侧附件：开关、状态文字、箭头、缩略图
+@property (nonatomic, strong) UIView *totalView;          // 整行自绘控件，如倍速分段
+@property (nonatomic, strong) UIImage *iconImage;
+@property (nonatomic, assign) BOOL disableInteraction;
+@property (nonatomic, copy) id willAppearBlock;
+@property (nonatomic, copy) NSString *referString;
+- (void)trackCellShow;
+- (void)configVM;
+- (void)configVMIfNeeded;              // hasConfig 为假时调一次 configVM
 @end
 
 @interface AWELongPressPanelViewGroupModel : NSObject                 // 长按面板的一组
@@ -506,6 +954,68 @@
 
 @interface AWELongPressPanelTableViewController : UIViewController   // 推荐页视频与图文共用
 - (NSArray *)dataArray;
+- (void)setDataArray:(NSArray *)dataArray;
+- (UITableView *)tableView;
+// 行点击的原生入口：执行 action 并埋点。
+- (void)executeActionForViewModel:(id)viewModel;
+// 按行在分组里的位置画卡片底与分割线；非 AWELongPressPanelSettingCell 的 cell 走通用卡片底。
+- (void)setSectionCornreRadiusAndLines:(UITableViewCell *)cell forRowAtIndexPath:(NSIndexPath *)indexPath;
+- (void)updateFirstScreenVisibleStatusForVMAtIndexPath:(NSIndexPath *)indexPath groupModel:(id)groupModel;
+@end
+
+// 作品长按菜单的普通行。
+@interface AWELongPressPanelSettingCell : UITableViewCell
+- (void)setLongPressPanelVM:(id)viewModel;
+- (UIView *)sectionBackgroundView;
+- (UIView *)sectionSeparatorView;
+- (UIView *)rightSubView;
+- (UIColor *)sectionBackgroundColorForHighlighted:(BOOL)highlighted;   // 卡片底色（sectionBackgroundView）
+@end
+
+@interface AWEModernLongPressPanelUIConfig : NSObject
++ (UIColor *)cellHighlightedColor;
++ (UIColor *)itemTitleColor;
+@end
+
+// 抖音列表框架：列表 VM 持有分区 VM，分区 VM 持有本分区的数据模型；评论长按面板基于它。
+@interface AWEBaseListViewModel : NSObject
+- (void)replaceBySectionViewModels:(NSArray *)sectionViewModels sync:(BOOL)sync;
+@end
+
+@interface AWEBaseListSectionViewModel : NSObject
+- (NSArray *)modelsArray;
+- (void)replaceByModels:(NSArray *)models animated:(BOOL)animated sync:(BOOL)sync;
+@end
+
+// 作品长按菜单的内容控制器，挂在 DUXContentSheet 的导航里，表格控制器是它的子控制器。
+@interface AWEVideoLongPressPanelViewController : UIViewController
+@end
+
+@interface AWEDanmakuSettingsPanelConfig : NSObject
+@property(nonatomic, assign) unsigned long long themeColorType;
+@end
+
+@interface AWEDanmakuSettingsPanelView : UIView
+- (instancetype)initWithDanmakuScene:(unsigned long long)scene config:(AWEDanmakuSettingsPanelConfig *)config delegate:(id)delegate;
+- (void)setSectionCornerRadiusAndLines:(UITableViewCell *)cell forRowAtIndexPath:(NSIndexPath *)indexPath;
+@end
+
+@interface AWEDanmakuSettingsPanelViewController : UIViewController
+@end
+
+// 抖音的视图级主题偏好：设了偏好的视图及其子树按指定的深 / 浅主题取色，取消后跟随全局主题。
+@interface UIView (AWEThemePreference)
+- (void)awe_preferDarkTheme;
+- (void)awe_cancelPreferredTheme;
+- (BOOL)awe_hasPreferredTheme;
+@end
+
+// 抖音现代长按面板的格子：图标在上、文字在下，updateUI: 按菜单项配置。
+@interface AWEModernLongPressHorizontalSettingItemCell : UICollectionViewCell
+- (void)updateUI:(id)viewModel;
+- (UIImageView *)buttonIcon;
+- (UILabel *)buttonLabel;
+- (void)setSeparatorHidden:(BOOL)hidden;
 @end
 
 @interface AWEModernLongPressPanelTableViewController : UIViewController
@@ -586,6 +1096,11 @@
 - (void)refreshCell;                 // 按当前属性重配所在 cell
 @end
 
+// 设置页分区页脚；说明文字的高度按比文字实际宽度更宽的宽度估算，长一些的文字会被截掉末行。
+@interface AWESettingsTableSectionFooterView : UITableViewHeaderFooterView
+- (UILabel *)footerNoticeLabel;
+@end
+
 @interface AWESettingSectionModel : NSObject
 @property (nonatomic, assign) NSInteger type;
 @property (nonatomic, assign) CGFloat sectionHeaderHeight;
@@ -614,6 +1129,7 @@
 // 设置页的行。卡片样式下标题、开关等都在 containerView（即 realContentView）里，
 // 项不可用时抖音调暗的是这一层。
 @interface AWESettingsTableViewCell : UITableViewCell
+@property (nonatomic, strong) UIView *lineView;
 @property (nonatomic, strong, readonly) AWESettingItemModel *itemModel;
 @property (nonatomic, strong, readonly) UILabel *titleLabel;
 @property (nonatomic, strong, readonly) UIImageView *iconImageView;
@@ -623,6 +1139,30 @@
 
 @interface AWENavigationBar : UIView
 @property (nonatomic, strong) UILabel *titleLabel;
+@end
+
+#pragma mark - 发布时间与地区用到的类
+
+// 作品的发布字段：createTime 为秒级时间戳（JSON create_time），cityCode 为城市代码（JSON city），
+// region 为国家地区码，ipAttribution 为原生属地文字（JSON ip_attribution）。
+@interface AWEAwemeModel (DKPublishInfo)
+@property (nonatomic, strong) NSNumber *createTime;
+@property (nonatomic, copy) NSString *cityCode;
+@property (nonatomic, copy) NSString *region;
+@property (nonatomic, copy) NSString *ipAttribution;
+@end
+
+// 左侧栈的时间元素（AWEPlayInteractionLeftElement 子类）：原生只在部分页面显示「完整日期  IP属地：…」一行。
+// shouldActiveWithData:（data 为作品，context 为元素上下文）按页面判定是否加入左侧栈；
+// 换作品时先 setModel:，再由 layoutElementView 重写 timestampLabel 文字。
+@interface AWEPlayInteractionTimestampElement : NSObject
+@property (nonatomic, strong) AWEAwemeModel *model;
+@property (nonatomic, strong) UILabel *timestampLabel;
+@property (nonatomic, assign) BOOL appear;
++ (BOOL)shouldActiveWithData:(id)data context:(id)context;
++ (NSString *)formattedDateForFullTimestamp:(double)timestamp;
+- (id)context;
+- (void)layoutElementView;
 @end
 
 #endif /* DouyinHeaders_h */

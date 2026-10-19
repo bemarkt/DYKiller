@@ -42,6 +42,10 @@ static NSString *const DKKeyCommentGlassClear    = @"DYKillerCommentGlassClear";
 // 材质单选（DKMakeGlassChoice）：总开关 + 清透档两个 BOOL，清透档关即系统 Regular。
 static NSString *const DKKeySharePanelGlass      = @"DYKillerSharePanelGlass";
 static NSString *const DKKeySharePanelGlassClear = @"DYKillerSharePanelGlassClear";
+// 分享面板精简：入口、累计功能目录、前缀 + shareType 的独立移除开关。
+static NSString *const DKKeyShareMenu            = @"DYKillerShareMenu";
+static NSString *const DKKeyShareMenuCatalog     = @"DYKillerShareMenuCatalog";
+static NSString *const DKKeyShareMenuHidePrefix  = @"DYKillerHideShareMenu.";
 
 #pragma mark - 功能组：应用内通知
 
@@ -81,6 +85,18 @@ static NSString *const DKKeyTabTitleProfile      = @"DYKillerTabBarTitle.homepag
 
 #pragma mark - 功能组：互动按钮
 
+// 图标单选：0 默认 / 1 第一款内置 / 2 第二款内置 / 3 自定义；图片项标识只用于文件与备份。
+static NSString *const DKKeyInteractionLikeStyle = @"DYKillerInteractionLikeStyle";
+static NSString *const DKKeyInteractionCommentStyle = @"DYKillerInteractionCommentStyle";
+static NSString *const DKKeyInteractionFavoriteStyle = @"DYKillerInteractionFavoriteStyle";
+static NSString *const DKKeyInteractionShareStyle = @"DYKillerInteractionShareStyle";
+static NSString *const DKKeyInteractionLikeBeforeIcon = @"DYKillerInteractionLikeBeforeIcon";
+static NSString *const DKKeyInteractionLikeAfterIcon = @"DYKillerInteractionLikeAfterIcon";
+static NSString *const DKKeyInteractionCommentIcon = @"DYKillerInteractionCommentIcon";
+static NSString *const DKKeyInteractionFavoriteBeforeIcon = @"DYKillerInteractionFavoriteBeforeIcon";
+static NSString *const DKKeyInteractionFavoriteAfterIcon = @"DYKillerInteractionFavoriteAfterIcon";
+static NSString *const DKKeyInteractionShareIcon = @"DYKillerInteractionShareIcon";
+
 // 透明度：0–100，默认 100；缩放：常规 50–100，默认 100；
 // 显示方式：0 显示 / 1 隐藏（不显示、仍可点击）/ 2 移除（不显示、不可点击，所在行收拢）。
 // 缩放与上移的范围登记在 DKAdjustRange.m，开启「扩展所有缩放与位移」后放宽。
@@ -109,6 +125,39 @@ static NSString *const DKKeyNicknameScale    = @"DYKillerNicknameScale";
 static NSString *const DKKeyDescriptionScale = @"DYKillerDescriptionScale";
 static NSString *const DKKeyInfoOffset       = @"DYKillerInfoOffset";
 
+#pragma mark - 功能组：弹幕改色
+
+// 颜色模式：0 固定颜色 / 1 随机纯色 / 2 随机渐变 / 3 固定彩虹 / 4 自定义渐变 / 5 旋转彩虹。
+static NSString *const DKKeyDanmakuColorEnabled = @"DYKillerEnableDanmakuColor";
+static NSString *const DKKeyDanmakuColorMode = @"DYKillerDanmakuColorMode";
+// 固定颜色的唯一规范存值；十六进制入口是同一值的另一个编辑入口。
+static NSString *const DKKeyDanmakuFixedColor = @"DYKillerDanmakuFixedColor";
+static NSString *const DKKeyDanmakuHexColor = @"DYKillerDanmakuHexColor";
+static NSString *const DKKeyDanmakuGradientColors = @"DYKillerDanmakuGradientColors";
+
+#pragma mark - 功能组：发布时间与地区
+
+// 播放页文案下方一行：具体发布时间（作品创建时间，按设备时区）与发布地区（作品城市代码与国家地区码，不含作者自选地点）。
+static NSString *const DKKeyPublishTimeEnabled = @"DYKillerShowPublishTime";
+static NSString *const DKKeyPublishLocationEnabled = @"DYKillerShowPublishLocation";
+// 国外地名解析用的 GeoNames 用户名；空串为未填写。两个网页入口只作行标识，不存值。
+static NSString *const DKKeyGeoNamesUsername = @"DYKillerGeoNamesUsername";
+static NSString *const DKKeyGeoNamesRegister = @"DYKillerGeoNamesRegister";
+static NSString *const DKKeyGeoNamesWebServices = @"DYKillerGeoNamesWebServices";
+// 「文字颜色」子页入口标识，不存值。
+static NSString *const DKKeyPublishTextColors = @"DYKillerPublishTextColors";
+// 时间、地区两段文字各一套颜色：改色开关 / 颜色模式（同弹幕改色六种）/ 固定颜色 / 十六进制入口 / 渐变颜色。
+static NSString *const DKKeyPublishTimeColorEnabled = @"DYKillerPublishTimeColor";
+static NSString *const DKKeyPublishTimeColorMode = @"DYKillerPublishTimeColorMode";
+static NSString *const DKKeyPublishTimeFixedColor = @"DYKillerPublishTimeFixedColor";
+static NSString *const DKKeyPublishTimeHexColor = @"DYKillerPublishTimeHexColor";
+static NSString *const DKKeyPublishTimeGradientColors = @"DYKillerPublishTimeGradientColors";
+static NSString *const DKKeyPublishLocationColorEnabled = @"DYKillerPublishLocationColor";
+static NSString *const DKKeyPublishLocationColorMode = @"DYKillerPublishLocationColorMode";
+static NSString *const DKKeyPublishLocationFixedColor = @"DYKillerPublishLocationFixedColor";
+static NSString *const DKKeyPublishLocationHexColor = @"DYKillerPublishLocationHexColor";
+static NSString *const DKKeyPublishLocationGradientColors = @"DYKillerPublishLocationGradientColors";
+
 #pragma mark - 功能组：音频可视化
 
 // 两项都是单选，用对话框选，故存整数而非 BOOL。
@@ -123,6 +172,8 @@ static NSString *const DKKeyDoubleTapOpenComment = @"DYKillerDoubleTapOpenCommen
 static NSString *const DKKeyDetailHideBottomBar = @"DYKillerHideChatVideoBottomBar";
 // 所有视频常态下都显示底部进度条。
 static NSString *const DKKeyProgressAlwaysVisible = @"DYKillerProgressAlwaysVisible";
+// 进度条旁的已播 / 总时长：0 关闭 / 1 两端（与进度条同一行）/ 2 右端 · 上方 / 3 右端 · 下方 / 4 两端 · 上方 / 5 两端 · 下方
+static NSString *const DKKeyProgressTimeStyle = @"DYKillerProgressTimeStyle";
 
 #pragma mark - 功能组：播放页精简
 
@@ -181,9 +232,85 @@ static NSString *const DKKeyBlockSideBarSwipe = @"DYKillerBlockSideBarSwipe";
 // 顶栏透明度：0–100，默认 100；作用于左侧栏入口、全部频道与搜索图标。
 static NSString *const DKKeyTopBarAlpha       = @"DYKillerTopBarAlpha";
 
+#pragma mark - 功能组：朋友页精简
+
+// 每项单选，存整数：0 显示 / 1 隐藏（不显示、仍可点击，位置保留）/ 2 移除（不显示、不可点击，按抖音原生排布收拢）。
+// 顶栏：左上角头像和加号（日常相机）、中间「限时日常」胶囊（移除时天窗也不再展开）、右上角朋友按钮。
+static NSString *const DKKeyFriendAvatarEntryMode   = @"DYKillerFriendAvatarEntryMode";
+static NSString *const DKKeyFriendDailyMode         = @"DYKillerFriendDailyMode";
+static NSString *const DKKeyFriendButtonMode        = @"DYKillerFriendButtonMode";
+// 作品：文案上方「朋友」标记、文案下方「私信 xxx」面板、头像下方「私信」图标；凡出现处都生效。
+static NSString *const DKKeyFriendRelationTagMode   = @"DYKillerFriendRelationTagMode";
+static NSString *const DKKeyFriendFastReplyMode     = @"DYKillerFriendFastReplyMode";
+static NSString *const DKKeyFriendSendMessageMode   = @"DYKillerFriendSendMessageMode";
+// 作品：昵称右侧「日常」标签、文案上方关注标签（你的关注 / 互相关注等关系文案）。
+static NSString *const DKKeyFriendStoryTagMode      = @"DYKillerFriendStoryTagMode";
+static NSString *const DKKeyFriendFollowTagMode     = @"DYKillerFriendFollowTagMode";
+// 内容：移除朋友页内容流里的「看看朋友推荐的作品」卡片（开关）。
+static NSString *const DKKeyFriendRemoveRecommendCard = @"DYKillerFriendRemoveRecommendCard";
+
+#pragma mark - 功能组：消息页精简
+
+// 每项单选，存整数：0 显示 / 1 隐藏（不显示、仍可点击，位置保留）/ 2 移除（不显示、不可点击，按抖音原生排布收拢）。
+// 顶栏
+static NSString *const DKKeyMessageSideBarMode      = @"DYKillerMessageSideBarMode";
+static NSString *const DKKeyMessageSlotMode         = @"DYKillerMessageSlotMode";
+static NSString *const DKKeyMessageSearchMode       = @"DYKillerMessageSearchMode";
+static NSString *const DKKeyMessagePlusMode         = @"DYKillerMessagePlusMode";
+// 列表顶部：头像行开头的业务入口、头像行里的好友头像、互动消息会话。
+static NSString *const DKKeyMessageDailyMode        = @"DYKillerMessageDailyMode";
+static NSString *const DKKeyMessageFriendAvatarMode = @"DYKillerMessageFriendAvatarMode";
+static NSString *const DKKeyMessageInteractionMode  = @"DYKillerMessageInteractionMode";
+
+#pragma mark - 功能组：长按菜单
+
+// 作品长按菜单：每个原生菜单项一个 BOOL 键，前缀 + 抖音菜单项标识（panelBizVMIdentifier）。
+static NSString *const DKKeyFeedMenuHidePrefix    = @"DYKillerHideFeedMenu.";
+// 打开过的作品长按菜单里出现的原生菜单项：NSArray<NSDictionary>，每项含 id/title。
+static NSString *const DKKeyFeedMenuCatalog       = @"DYKillerFeedMenuCatalog";
+// 宫格排列（单选，整数）：0 每行 1 个（抖音原生列表）/ 1 每行 2 个 / 2 每行 3 个 / 3 每行 4 个。
+static NSString *const DKKeyFeedMenuColumns       = @"DYKillerFeedMenuColumns";
+// 设置子页入口的 identifier，NSUserDefaults 里不写值。
+static NSString *const DKKeyFeedMenu              = @"DYKillerFeedMenu";
+// 评论长按菜单：每项一个 BOOL 键，前缀 + 菜单项标识（元素 elementType 数字，或分享行 share）。
+static NSString *const DKKeyCommentMenuHidePrefix = @"DYKillerHideCommentMenu.";
+static NSString *const DKKeyCommentMenuCatalog    = @"DYKillerCommentMenuCatalog";
+static NSString *const DKKeyCommentMenuColumns    = @"DYKillerCommentMenuColumns";
+static NSString *const DKKeyCommentMenu           = @"DYKillerCommentMenu";
+// 作品长按菜单的材质单选（DKMakeGlassChoice）：总开关 + 清透档两个 BOOL，清透档关即系统 Regular。
+static NSString *const DKKeyFeedMenuGlass         = @"DYKillerFeedMenuGlass";
+static NSString *const DKKeyFeedMenuGlassClear    = @"DYKillerFeedMenuGlassClear";
+// 复制评论时去掉开头的「@用户名: 」，只复制评论内容。
+static NSString *const DKKeyCommentCopyWithoutName = @"DYKillerCommentCopyWithoutName";
+
 #pragma mark - 功能组：个人主页
 
 static NSString *const DKKeyProfileHideUGCGuide = @"DYKillerHideProfileUGCGuide";
+
+// 个人主页精简，只作用于自己的主页。
+// 每项单选，存整数：0 显示 / 1 隐藏（不显示、仍可点击，位置保留）/ 2 移除（不显示、不可点击，按抖音原生排布收拢）。
+// 顶栏：添加好友、访客、搜索图标、侧栏图标。
+static NSString *const DKKeyProfileAddFriendMode     = @"DYKillerProfileAddFriendMode";
+static NSString *const DKKeyProfileVisitorMode       = @"DYKillerProfileVisitorMode";
+static NSString *const DKKeyProfileSearchMode        = @"DYKillerProfileSearchMode";
+static NSString *const DKKeyProfileSideBarMode       = @"DYKillerProfileSideBarMode";
+// 头像与昵称：头像右下角加号、昵称后的切换账号箭头、抖音号下方的胶囊行。
+static NSString *const DKKeyProfileAvatarPlusMode    = @"DYKillerProfileAvatarPlusMode";
+static NSString *const DKKeyProfileSwitchAccountMode = @"DYKillerProfileSwitchAccountMode";
+static NSString *const DKKeyProfileCapsuleMode       = @"DYKillerProfileCapsuleMode";
+// 数据与按钮：获赞 / 互关 / 关注 / 粉丝整行、编辑主页；两者共用一行。
+static NSString *const DKKeyProfileStatsMode         = @"DYKillerProfileStatsMode";
+static NSString *const DKKeyProfileEditMode          = @"DYKillerProfileEditMode";
+// 内容：「记录下幸福瞬间」等发布引导横幅（按所在分区识别）。
+static NSString *const DKKeyProfileGuideBannerMode   = @"DYKillerProfileGuideBannerMode";
+// 功能区（开关）：移除观看历史、全部功能等入口所在的整行，不占位。
+static NSString *const DKKeyProfileRemoveServiceArea = @"DYKillerProfileRemoveServiceArea";
+// 分页（开关）：开启即移除对应分页。
+static NSString *const DKKeyProfileRemovePostTab      = @"DYKillerProfileRemovePostTab";
+static NSString *const DKKeyProfileRemoveDailyTab     = @"DYKillerProfileRemoveDailyTab";
+static NSString *const DKKeyProfileRemoveFavoriteTab  = @"DYKillerProfileRemoveFavoriteTab";
+static NSString *const DKKeyProfileRemoveLikeTab      = @"DYKillerProfileRemoveLikeTab";
+static NSString *const DKKeyProfileRemoveFootprintTab = @"DYKillerProfileRemoveFootprintTab";
 
 #pragma mark - 功能组：媒体保存
 
@@ -226,6 +353,13 @@ static NSString *const DKKeySettingsPageGlass = @"DYKillerPageLiquidGlass";
 
 // 扩展所有缩放与位移：开启后 DKAdjustRange 登记的各项按扩展范围生效。开启前须确认，不进备份。
 static NSString *const DKKeyAdjustRangeExtended = @"DYKillerAdjustRangeExtended";
+
+#pragma mark - 功能组：快捷入口
+
+// 个人主页功能区末尾的 DYKiller 设置入口（开关，只作用于自己的主页）。
+static NSString *const DKKeyProfileSettingsEntry     = @"DYKillerProfileSettingsEntry";
+// 入口文字（单选，整数）：0「DYKiller」/ 1「插件设置」。
+static NSString *const DKKeyProfileSettingsEntryName = @"DYKillerProfileSettingsEntryName";
 
 #pragma mark - 功能组：调试工具
 

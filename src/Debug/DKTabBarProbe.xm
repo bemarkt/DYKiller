@@ -13,9 +13,17 @@
 #import "DKPlusIcon.h"
 #import "DKTabBarAppearance.h"
 #import "DKInteractionAppearance.h"
+#import "DKInteractionIcons.h"
 #import "DKInfoAppearance.h"
+#import "DKPublishInfo.h"
+#import "DKDanmakuColor.h"
 #import "DKPlaybackClean.h"
+#import "DKMessageClean.h"
+#import "DKFriendClean.h"
+#import "DKProfileClean.h"
+#import "DKLongPressMenu.h"
 #import "DKProgressAlwaysVisible.h"
+#import "DKProgressTime.h"
 #import "DKAdjustRange.h"
 #import "DKTabBarBackdrop.h"
 #import "DKTopBarAlpha.h"
@@ -1129,17 +1137,40 @@ NSString *DKTabBarProbeReport(void) {
     [out appendString:@"\n----- 进度条常显 -----\n"];
     [out appendString:DKProgressAlwaysVisibleStatus()];
 
+    [out appendString:@"\n----- 显示视频时长 -----\n"];
+    [out appendString:DKProgressTimeStatus()];
+
     [out appendString:@"\n----- 分享面板输入 -----\n"];
     DKProbeAppendShareInput(out);
 
     [out appendString:@"\n----- 互动按钮外观 -----\n"];
     [out appendString:DKInteractionAppearanceStatus()];
+    [out appendString:@"\n----- 互动按钮更换图标 -----\n"];
+    [out appendFormat:@"%@\n", DKInteractionIconsStatus()];
 
     [out appendString:@"\n----- 昵称文案外观 -----\n"];
     [out appendString:DKInfoAppearanceStatus()];
 
+    [out appendString:@"\n----- 发布时间与地区 -----\n"];
+    [out appendString:DKPublishInfoStatus()];
+
+    [out appendString:@"\n----- 弹幕改色 -----\n"];
+    [out appendString:DKDanmakuColorStatus()];
+
     [out appendString:@"\n----- 播放页精简 -----\n"];
     [out appendString:DKPlaybackCleanStatus()];
+
+    [out appendString:@"\n----- 朋友页精简 -----\n"];
+    [out appendString:DKFriendCleanStatus()];
+
+    [out appendString:@"\n----- 消息页精简 -----\n"];
+    [out appendString:DKMessageCleanStatus()];
+
+    [out appendString:@"\n----- 个人主页精简 -----\n"];
+    [out appendString:DKProfileCleanStatus()];
+
+    [out appendString:@"\n----- 长按菜单 -----\n"];
+    [out appendString:DKLongPressMenuStatus()];
 
     [out appendString:@"\n----- 顶栏透明度 -----\n"];
     [out appendString:DKTopBarAlphaStatus()];
